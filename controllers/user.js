@@ -4,55 +4,61 @@ import { setCookie } from "../utils/cookie.js";
 
 /******function for getting all users*****/
 export const getAllUsers = async (req, res) => {
-  const users = await User.find({});
-  res.status(200).json({
-    success: true,
-    users,
-  });
+  try {
+    const users = await User.find({});
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 /*******function for register user**********/
 export const register = async (req, res) => {
-  const { name, email, password } = req.body; //destructure value entered by user
-  let user = await User.findOne({ email }); // checking same email exist in db
+  try {
+    const { name, email, password } = req.body; //destructure value entered by user
+    let user = await User.findOne({ email }); // checking same email exist in db
 
-  //if exist then give message already exist with status 404
-  if (user) {
-    return res.status(404).json({
-      success: false,
-      message: "user already exist",
-    });
-  } else {
-    //if not then create one
-    const hashPassword = await bcrypt.hash(password, 10); //hsashing pass before storing
-    user = await User.create({ name, email, password: hashPassword });
+    //if exist then give message already exist with status 404
+    if (user) {
+      return res.status(404).json({
+        success: false,
+        message: "user already exist",
+      });
+    } else {
+      //if not then create one
+      const hashPassword = await bcrypt.hash(password, 10); //hsashing pass before storing
+      user = await User.create({ name, email, password: hashPassword });
 
-    //once user is created send success message and store cookie
-    setCookie(user, res, "User Registered", 201);
+      //once user is created send success message and store cookie
+      setCookie(user, res, "User Registered", 201);
+    }
+  } catch (error) {
+    next(error);
   }
 };
 
 /***********function for user login*****************/
 export const login = async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email }).select("+password"); //because in our user schema select for password is false
-  //if user not found
-  if (!user)
-    return res.status(404).json({
-      success: false,
-      message: "Invalid Email or Password",
-    });
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email }).select("+password"); //because in our user schema select for password is false
+    //if user not found
+    if (!user) return next(new ErrorHandler("Invalid Email or Password", 400));
 
-  //if user found but incorrect password
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch)
-    return res.status(404).json({
-      success: false,
-      message: "Invalid Email or Password",
-    });
+    //if user found but incorrect password
+    const isMatch = await bcrypt.compare(password, user.password);
 
-  // if user found and password is correct
-  setCookie(user, res, `welcome back, ${user.name} !`, 200);
+    if (!isMatch)
+      return next(new ErrorHandler("Invalid Email or Password", 400));
+
+    // if user found and password is correct
+    setCookie(user, res, `welcome back, ${user.name} !`, 200);
+  } catch (error) {
+    next(error);
+  }
 };
 
 /***********function for if user logged in to see his pofile*****************/
@@ -66,7 +72,7 @@ export const getMyProfile = (req, res) => {
 };
 
 /***********function for user logout*****************/
-export const logout = async (req, res) => {
+export const logout = (req, res) => {
   res
     .cookie("token", "", { expires: new Date(Date.now()) })
     .status(200)
